@@ -1,8 +1,8 @@
 from flask import Flask, request
 from flask_restful import Api, Resource, reqparse, abort, fields, marshal_with
 from flask_sqlalchemy import SQLAlchemy
-from datetime import datetime
-from dateutil import parser as datetime_parser
+import datetime
+import time
 
 app = Flask(__name__)
 # specify that we're using restful api
@@ -34,20 +34,20 @@ class DonationRecords(db.Model):
     stream_id = db.Column(db.Integer, nullable = False)
     amount = db.Column(db.Integer, nullable = False)
     remain = db.Column(db.Integer, nullable = False)
-    create_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
-    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+    create_at = db.Column(db.Float, default=time.time(), nullable=False)
+    donor_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
     
 
     def __repr__(self):
-        return f"DonationRecords(donation_id = {self.id}, stream_id = {self.stream_id}, amount = {self.amount}, remain = {self.remain}, create_at = {self.create_at}, donor_id = {self.user_id})"
+        return f"DonationRecords(donation_id = {self.id}, stream_id = {self.stream_id}, amount = {self.amount}, remain = {self.remain}, create_at = {self.create_at}, donor_id = {self.donor_id})"
 
 # DB: Transactions
 class Transactions(db.Model):
     id = db.Column(db.Integer, primary_key=True, autoincrement = True)
-    success = db.Column(db.Boolean, nullable=False)
+    success = db.Column(db.Boolean, default =True, nullable=False)
     amount = db.Column(db.Integer, nullable=False)
     cost = db.Column(db.Float, nullable=False)
-    issue_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    issue_at = db.Column(db.Float, default=time.time(), nullable=False)
     user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable = False)
 
     def __repr__(self):
@@ -57,13 +57,13 @@ class Transactions(db.Model):
 class Streams(db.Model):
     id = db.Column(db.Integer, primary_key=True, autoincrement = True)
     creator_id = db.Column(db.Integer, db.ForeignKey("users.id"))
-    create_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    create_at = db.Column(db.Float, default=time.time(), nullable=False)
 
     def __repr__(self):
         return f"Streams(id = {self.id}, creator_id = {self.creator_id}, create_at = {self.create_at})"
 
 # Initialize
-db.create_all()
+#db.create_all()
 
 # serialize
 resource_fields_donation = {
@@ -71,15 +71,15 @@ resource_fields_donation = {
     'stream_id' : fields.Integer,
     'amount': fields.Integer,
     'remain': fields.Integer,
-    'create_at': fields.DateTime(dt_format='iso8601'),
-    'user_id': fields.Integer,
+    'create_at': fields.Float,
+    'donor_id': fields.Integer,
 }
 resource_fields_transaction= {
     'id' : fields.Integer,
     'success' : fields.Boolean,
     'amount': fields.Integer,
     'cost': fields.Float,
-    'issue_at': fields.DateTime(dt_format='iso8601'),
+    'issue_at': fields.Float,
     'user_id': fields.Integer,
 }
 
@@ -105,19 +105,23 @@ class Donation(Resource):
         args = parser.parse_args()
         # extra data info parser
         extra_parser = reqparse.RequestParser()
-        extra_parser.add_argument("user_id", type = int, help = "user_id require", required = True)
+        extra_parser.add_argument("donor_id", type = int, help = "donor_id require", required = True)
         extra_parser.add_argument("amount", type = int, help = "amount require", required = True)
-        # time is not able to take in datetime type from json
-        #extra_parser.add_argument("datetime", type = datetime, help = "datetime require", required = True)
+        #extra_parser.add_argument("datetime", type = float, help = "datetime require", required = True)
 
-        # create a new Donation istance
-        # check signature
-        # remain -> get from user model
-        # amount -> original - amount
+        # get user info
+        amount=args["payload"]["amount"]
+        donor_id=args['payload']['donor_id']
+        user = Users.query.filter_by(id=donor_id).first()
+        if user is not None:
+            if user.points >= amount:
+                remain = user.points - amount
+                user.points = remain
+
         donate = DonationRecords(stream_id=stream_id, 
-                                 amount=args["payload"]["amount"], 
-                                 remain=100, 
-                                 user_id=args['payload']['user_id']
+                                 amount=amount, 
+                                 remain=remain, 
+                                 donor_id=donor_id
                                 )
         db.session.add(donate)
         db.session.commit()
@@ -136,19 +140,11 @@ class Transaction(Resource):
         # extra data info parser
         extra_parser = reqparse.RequestParser()
         extra_parser.add_argument("user_id", type=int, help="user_id require", required=True)
-        #extra_parser.add_argument("datetime", type=str, help="datetime require", required=True)
-        #extra_args = extra_parser.parse_args()
+        extra_parser.add_argument("datetime", type=float, help="datetime require", required=True)
 
-        # if 'user_id' not in extra_args or extra_args['user_id'] is None:
-        #     # Abort the request with a custom error message
-        #     abort(400, message={"user_id": "user_id is required"})
-
-        #datetime_str = extra_args['datetime']
-        #datetime_obj = datetime_parser.parse(datetime_str)
-        #after_format = datetime_parser.parse(args['payload']['datetime'])
         result = Transactions.query.filter_by(user_id=args['payload']['user_id']).all()
-        result = Transactions.query.filter_by(issue_at = datetime(2024, 1, 14, 13, 45, 52, 293900)).all()
-        #result = Transactions.query.filter_by(issue_at=after_format).all()
+        result = Transactions.query.filter_by(issue_at = args['payload']['datetime']).all()
+
         return result, 200
     
     @marshal_with(resource_fields_transaction)
@@ -163,9 +159,16 @@ class Transaction(Resource):
         extra_parser.add_argument("user_id", type=int, help="user_id require", required=True)
         extra_parser.add_argument("amount", type=int, help="amount require", required=True)
         extra_parser.add_argument("cost", type=float, help="cost require", required=True)
-        extra_parser.add_argument("issue_at", type=int, help="issue_at require")
+        extra_parser.add_argument("issue_at", type=float, help="issue_at require", required=True)
         #set success true
-        result = Transactions(success = True, amount=args['payload']['amount'],cost=args['payload']['cost'], user_id=args["payload"]['user_id'])
+        amount = args['payload']['amount']
+        user_id = args["payload"]['user_id']
+        cost = args['payload']['cost']
+        user = Users.query.filter_by(id=user_id).first()
+        user.points += amount
+        result = Transactions(amount=amount,
+                              cost=cost, 
+                              user_id=user_id)
         db.session.add(result)
         db.session.commit()
         return result, 200
