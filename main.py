@@ -17,7 +17,7 @@ class Users(db.Model):
     id = db.Column(db.Integer, primary_key=True, autoincrement = True)
     secret = db.Column(db.Text, nullable = False, unique = True)
     active = db.Column(db.Boolean, default = True)
-    points = db.Column(db.Integer, nullable = False)
+    points = db.Column(db.Integer, default = 0, nullable = False)
     username = db.Column(db.Text, nullable = False)
     can_stream = db.Column(db.Boolean, default = False)
     
@@ -44,7 +44,7 @@ class DonationRecords(db.Model):
 # DB: Transactions
 class Transactions(db.Model):
     id = db.Column(db.Integer, primary_key=True, autoincrement = True)
-    success = db.Column(db.Boolean, default =True, nullable=False)
+    success = db.Column(db.Boolean)
     amount = db.Column(db.Integer, nullable=False)
     cost = db.Column(db.Float, nullable=False)
     issue_at = db.Column(db.Float, default=time.time(), nullable=False)
