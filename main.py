@@ -1,15 +1,13 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, Response, json
 from flask_restful import Api, Resource, reqparse, abort, fields, marshal_with
 from flask_sqlalchemy import SQLAlchemy
-import datetime
-import time
+from datetime import datetime
 
 app = Flask(__name__)
 # specify that we're using restful api
 api = Api(app)
 
 #config DB
-app.config["timeout"] = 0.2
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///Database.db'
 db = SQLAlchemy(app)
 
@@ -32,10 +30,10 @@ class Users(db.Model):
 # DB: Donations
 class DonationRecords(db.Model):
     id = db.Column(db.Integer, primary_key=True, autoincrement = True)
-    stream_id = db.Column(db.Integer, db.ForeignKey("Streams.id"), nullable = False)
+    stream_id = db.Column(db.Integer, db.ForeignKey("streams.id"), nullable = False)
     amount = db.Column(db.Integer, nullable = False)
     remain = db.Column(db.Integer, nullable = False)
-    create_at = db.Column(db.Float, default=time.time(), nullable=False)
+    create_at = db.Column(db.Float, nullable=False)
     donor_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
     
 
@@ -48,7 +46,7 @@ class Transactions(db.Model):
     success = db.Column(db.Boolean)
     amount = db.Column(db.Integer, nullable=False)
     cost = db.Column(db.Float, nullable=False)
-    issue_at = db.Column(db.Float, default=time.time(), nullable=False)
+    issue_at = db.Column(db.Float, nullable=False)
     user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable = False)
 
     def __repr__(self):
@@ -58,7 +56,8 @@ class Transactions(db.Model):
 class Streams(db.Model):
     id = db.Column(db.Integer, primary_key=True, autoincrement = True)
     creator_id = db.Column(db.Integer, db.ForeignKey("users.id"))
-    create_at = db.Column(db.Float, default=time.time(), nullable=False)
+    create_at = db.Column(db.Float, nullable=False)
+    donationrecords = db.relationship('DonationRecords', backref = 'streams')
 
     def __repr__(self):
         return f"Streams(id = {self.id}, creator_id = {self.creator_id}, create_at = {self.create_at})"
@@ -92,7 +91,7 @@ class Donation(Resource):
     def get(self, stream_id):
         try:
             result = DonationRecords.query.filter_by(stream_id=stream_id).all()
-            # print (type(result))
+            print (type(result))
         except Exception as e:
             print(e)
         
@@ -121,20 +120,21 @@ class Donation(Resource):
 
             # get user info
             amount=args["payload"]["amount"]
-            donor_id=args['payload']['donor_id']
+            donor_id=args["payload"]["donor_id"]
             user = Users.query.filter_by(id=donor_id).first()
             if user is None:
                 raise AException("user is none")
             if user.points >= amount:
-                remain = user.points - amount
-                user.points = remain
+                user.points -= amount
+                remain = user.points
 
-            donate = DonationRecords(stream_id=stream_id, 
+            donation = DonationRecords(stream_id=stream_id, 
                                     amount=amount, 
                                     remain=remain, 
-                                    donor_id=donor_id
+                                    donor_id=donor_id,
+                                    create_at = datetime.now().timestamp()
                                     )
-            db.session.add(donate)
+            db.session.add(donation)
             db.session.commit()
         except Exception as e:
             print(e)
@@ -142,7 +142,7 @@ class Donation(Resource):
             pass
             raise AException('idk')
         
-        return donate, 200
+        return donation, 200
 
 
 # 2. Transaction API
@@ -160,8 +160,8 @@ class Transaction(Resource):
             extra_parser.add_argument("user_id", type=int, help="user_id require", required=True)
             extra_parser.add_argument("datetime", type=float, help="datetime require", required=True)
 
-            result = Transactions.query.filter_by(user_id=args['payload']['user_id']).all()
-            result = Transactions.query.filter_by(issue_at = args['payload']['datetime']).all()
+            result = Transactions.query.filter_by(user_id=args["payload"]["user_id"]).all()
+            result = Transactions.query.filter_by(issue_at = args["payload"]["datetime"]).all()
         except Exception as e:
             print(e)
         except:
@@ -184,15 +184,16 @@ class Transaction(Resource):
         extra_parser.add_argument("cost", type=float, help="cost require", required=True)
         extra_parser.add_argument("issue_at", type=float, help="issue_at require", required=True)
         #set success true
-        amount = args['payload']['amount']
-        user_id = args["payload"]['user_id']
-        cost = args['payload']['cost']
+        amount = args["payload"]["amount"]
+        user_id = args["payload"]["user_id"]
+        cost = args["payload"]["cost"]
         try:
             user = Users.query.filter_by(id=user_id).first()
             user.points += amount
             result = Transactions(amount=amount,
                                 cost=cost, 
-                                user_id=user_id)
+                                user_id=user_id,
+                                issue_at=datetime.now().timestamp())
             db.session.add(result)
             db.session.commit()
         except Exception as e:
