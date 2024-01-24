@@ -205,6 +205,7 @@ class Transaction(Resource):
         return result, 200
     
 
+
 class AException(Exception):
     def __init__(self, message: str):
         super().__init__(message)
