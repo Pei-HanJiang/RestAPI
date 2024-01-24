@@ -1,4 +1,4 @@
-from flask import Flask, request
+from flask import Flask, request, jsonify
 from flask_restful import Api, Resource, reqparse, abort, fields, marshal_with
 from flask_sqlalchemy import SQLAlchemy
 import datetime
@@ -89,9 +89,17 @@ class Donation(Resource):
     # get donation info
     @marshal_with(resource_fields_donation)
     def get(self, stream_id):
-        result = DonationRecords.query.filter_by(stream_id=stream_id).all()
+        try:
+            result = DonationRecords.query.filter_by(stream_id=stream_id).all()
+            # print (type(result))
+        except Exception as e:
+            print(e)
+        
+        if len(result) == 0:
+                raise AException('stream not exist')
+        return (result), 200
+        
         # An Object, must serialize it at line 66
-        return result, 200
     
     # post a new donation 
     # needs to update donation records, and user points
@@ -99,32 +107,40 @@ class Donation(Resource):
     def post(self, stream_id):
         # automatically parse the data sent(define the needed parameters)
         # warning!!! nested json requires special parsing techniques
-        parser = reqparse.RequestParser()
-        parser.add_argument("signature", type=str, help="signature require", required = True)
-        parser.add_argument("payload", type=dict, help="payload require", required = True)
-        args = parser.parse_args()
-        # extra data info parser
-        extra_parser = reqparse.RequestParser()
-        extra_parser.add_argument("donor_id", type = int, help = "donor_id require", required = True)
-        extra_parser.add_argument("amount", type = int, help = "amount require", required = True)
-        #extra_parser.add_argument("datetime", type = float, help = "datetime require", required = True)
+        try:
+            parser = reqparse.RequestParser()
+            parser.add_argument("signature", type=str, help="signature require", required = True)
+            parser.add_argument("payload", type=dict, help="payload require", required = True)
+            args = parser.parse_args()
+            # extra data info parser
+            extra_parser = reqparse.RequestParser()
+            extra_parser.add_argument("donor_id", type = int, help = "donor_id require", required = True)
+            extra_parser.add_argument("amount", type = int, help = "amount require", required = True)
+            #extra_parser.add_argument("datetime", type = float, help = "datetime require", required = True)
 
-        # get user info
-        amount=args["payload"]["amount"]
-        donor_id=args['payload']['donor_id']
-        user = Users.query.filter_by(id=donor_id).first()
-        if user is not None:
+            # get user info
+            amount=args["payload"]["amount"]
+            donor_id=args['payload']['donor_id']
+            user = Users.query.filter_by(id=donor_id).first()
+            if user is None:
+                raise AException("user is none")
             if user.points >= amount:
                 remain = user.points - amount
                 user.points = remain
 
-        donate = DonationRecords(stream_id=stream_id, 
-                                 amount=amount, 
-                                 remain=remain, 
-                                 donor_id=donor_id
-                                )
-        db.session.add(donate)
-        db.session.commit()
+            donate = DonationRecords(stream_id=stream_id, 
+                                    amount=amount, 
+                                    remain=remain, 
+                                    donor_id=donor_id
+                                    )
+            db.session.add(donate)
+            db.session.commit()
+        except Exception as e:
+            print(e)
+        except:
+            pass
+            raise AException('idk')
+        
         return donate, 200
 
 
@@ -132,18 +148,24 @@ class Donation(Resource):
 class Transaction(Resource):
     @marshal_with(resource_fields_transaction)
     def get(self):
-        parser = reqparse.RequestParser()
-        parser.add_argument("signature", type=str, help="signature require", required=True)
-        parser.add_argument("payload", type=dict, help="payload require", required=True)
-        args = parser.parse_args()
+        try:
+            parser = reqparse.RequestParser()
+            parser.add_argument("signature", type=str, help="signature require", required=True)
+            parser.add_argument("payload", type=dict, help="payload require", required=True)
+            args = parser.parse_args()
 
-        # extra data info parser
-        extra_parser = reqparse.RequestParser()
-        extra_parser.add_argument("user_id", type=int, help="user_id require", required=True)
-        extra_parser.add_argument("datetime", type=float, help="datetime require", required=True)
+            # extra data info parser
+            extra_parser = reqparse.RequestParser()
+            extra_parser.add_argument("user_id", type=int, help="user_id require", required=True)
+            extra_parser.add_argument("datetime", type=float, help="datetime require", required=True)
 
-        result = Transactions.query.filter_by(user_id=args['payload']['user_id']).all()
-        result = Transactions.query.filter_by(issue_at = args['payload']['datetime']).all()
+            result = Transactions.query.filter_by(user_id=args['payload']['user_id']).all()
+            result = Transactions.query.filter_by(issue_at = args['payload']['datetime']).all()
+        except Exception as e:
+            print(e)
+        except:
+            pass
+            raise AException('idk')
 
         return result, 200
     
@@ -164,14 +186,28 @@ class Transaction(Resource):
         amount = args['payload']['amount']
         user_id = args["payload"]['user_id']
         cost = args['payload']['cost']
-        user = Users.query.filter_by(id=user_id).first()
-        user.points += amount
-        result = Transactions(amount=amount,
-                              cost=cost, 
-                              user_id=user_id)
-        db.session.add(result)
-        db.session.commit()
+        try:
+            user = Users.query.filter_by(id=user_id).first()
+            user.points += amount
+            result = Transactions(amount=amount,
+                                cost=cost, 
+                                user_id=user_id)
+            db.session.add(result)
+            db.session.commit()
+        except Exception as e:
+            print(e)
+        except:
+            pass
+            raise AException('idk')
+        
         return result, 200
+    
+
+class AException(Exception):
+    def __init__(self, message: str):
+        super().__init__(message)
+        print(message)
+        abort(400)
 # add api
 api.add_resource(Donation, "/donation/<int:stream_id>")
 api.add_resource(Transaction,"/transaction")
@@ -179,4 +215,4 @@ api.add_resource(Transaction,"/transaction")
 
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    app.run(host="127.0.0.1", port=5555,debug=True)
