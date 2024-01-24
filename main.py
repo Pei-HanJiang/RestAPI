@@ -2,7 +2,8 @@ from flask import Flask, request, jsonify, Response, json
 from flask_restful import Api, Resource, reqparse, abort, fields, marshal_with
 from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime
-
+import logging
+logging.basicConfig(level=logging.DEBUG)
 app = Flask(__name__)
 # specify that we're using restful api
 api = Api(app)
@@ -10,7 +11,6 @@ api = Api(app)
 #config DB
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///Database.db'
 db = SQLAlchemy(app)
-
 # DB: Users
 class Users(db.Model):
     id = db.Column(db.Integer, primary_key=True, autoincrement = True)
@@ -91,13 +91,16 @@ class Donation(Resource):
     def get(self, stream_id):
         try:
             result = DonationRecords.query.filter_by(stream_id=stream_id).all()
-            print (type(result))
+            # print (type(result))
         except Exception as e:
-            print(e)
+            logging.error('Exception ERROR => ' + str(e))
+            abort(400)
         
         if len(result) == 0:
-                raise AException('stream not exist')
-        return (result), 200
+            logging.error('no results')
+            abort(400)
+        else:
+            return (result), 200
         
         # An Object, must serialize it at line 66
     
@@ -116,31 +119,35 @@ class Donation(Resource):
             extra_parser = reqparse.RequestParser()
             extra_parser.add_argument("donor_id", type = int, help = "donor_id require", required = True)
             extra_parser.add_argument("amount", type = int, help = "amount require", required = True)
-            #extra_parser.add_argument("datetime", type = float, help = "datetime require", required = True)
+            extra_parser.add_argument("create_at", type = float, help = "create time require", required = True)
 
             # get user info
+            create_at=args["payload"]["create_at"]
             amount=args["payload"]["amount"]
             donor_id=args["payload"]["donor_id"]
             user = Users.query.filter_by(id=donor_id).first()
             if user is None:
-                raise AException("user is none")
-            if user.points >= amount:
-                user.points -= amount
-                remain = user.points
+                logging.error('no user')
+                abort(400)
+            if user.points < amount:
+                logging.error('no enough points')
+                abort(400)
+            if datetime.now().timestamp()-create_at < 0.2 or datetime.now().timestamp()-create_at > 0.2:
+                logging.error('time out')
+                abort(400)
+            remain = user.points - amount
 
             donation = DonationRecords(stream_id=stream_id, 
                                     amount=amount, 
                                     remain=remain, 
                                     donor_id=donor_id,
-                                    create_at = datetime.now().timestamp()
+                                    create_at = create_at
                                     )
             db.session.add(donation)
             db.session.commit()
         except Exception as e:
-            print(e)
-        except:
-            pass
-            raise AException('idk')
+            logging.error('Exception ERROR => ' + str(e))
+            abort(400)
         
         return donation, 200
 
@@ -163,10 +170,8 @@ class Transaction(Resource):
             result = Transactions.query.filter_by(user_id=args["payload"]["user_id"]).all()
             result = Transactions.query.filter_by(issue_at = args["payload"]["datetime"]).all()
         except Exception as e:
-            print(e)
-        except:
-            pass
-            raise AException('idk')
+            logging.error('Exception ERROR => ' + str(e))
+            abort(400)
 
         return result, 200
     
@@ -197,20 +202,12 @@ class Transaction(Resource):
             db.session.add(result)
             db.session.commit()
         except Exception as e:
-            print(e)
-        except:
-            pass
-            raise AException('idk')
+            logging.error('Exception ERROR => ' + str(e))
+            abort(400)
         
         return result, 200
     
 
-
-class AException(Exception):
-    def __init__(self, message: str):
-        super().__init__(message)
-        print(message)
-        abort(400)
 # add api
 api.add_resource(Donation, "/donation/<int:stream_id>")
 api.add_resource(Transaction,"/transaction")
