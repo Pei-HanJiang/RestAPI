@@ -31,7 +31,7 @@ class Users(db.Model):
 # DB: Donations
 class DonationRecords(db.Model):
     id = db.Column(db.Integer, primary_key=True, autoincrement = True)
-    stream_id = db.Column(db.Integer, nullable = False)
+    stream_id = db.Column(db.Integer, db.ForeignKey("Streams.id"), nullable = False)
     amount = db.Column(db.Integer, nullable = False)
     remain = db.Column(db.Integer, nullable = False)
     create_at = db.Column(db.Float, default=time.time(), nullable=False)
