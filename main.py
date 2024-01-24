@@ -9,6 +9,7 @@ app = Flask(__name__)
 api = Api(app)
 
 #config DB
+app.config["timeout"] = 0.2
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///Database.db'
 db = SQLAlchemy(app)
 
