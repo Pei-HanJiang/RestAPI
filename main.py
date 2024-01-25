@@ -137,8 +137,8 @@ class Donation(Resource):
             if datetime.now().timestamp()-datetime < 0.2 or datetime - datetime.now().timestamp() > 0:
                 logging.error('time out')
                 abort(400)
-            remain = user.points - amount
             user.points -= amount
+            remain = user.points
             
             result = DonationRecords(stream_id=stream_id, 
                                     amount=amount, 
