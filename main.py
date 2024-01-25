@@ -1,6 +1,7 @@
-from flask import Flask
+from flask import Flask,json
 from flask_restful import Api, Resource, reqparse, abort, fields, marshal_with
 from flask_sqlalchemy import SQLAlchemy
+from sqlalchemy import and_
 from datetime import datetime
 import logging
 import os
@@ -68,7 +69,7 @@ class Streams(db.Model):
 
 # serialize
 resource_fields_donation = {
-    'id' : fields.Integer,
+    'donation_id' : fields.Integer,
     'stream_id' : fields.Integer,
     'amount': fields.Integer,
     'remain': fields.Integer,
@@ -76,7 +77,7 @@ resource_fields_donation = {
     'donor_id': fields.Integer,
 }
 resource_fields_transaction= {
-    'id' : fields.Integer,
+    'transaction_id' : fields.Integer,
     'success' : fields.Boolean,
     'amount': fields.Integer,
     'cost': fields.Float,
@@ -92,7 +93,8 @@ class Donation(Resource):
     def get(self, stream_id):
         try:
             result = DonationRecords.query.filter_by(stream_id=stream_id).all()
-            # print (type(result))
+            print(result)
+            print (type(result))
         except Exception as e:
             logging.error('Exception ERROR => ' + str(e))
             abort(400)
@@ -169,7 +171,6 @@ class Transaction(Resource):
             extra_parser.add_argument("datetime", type=float, help="datetime require", required=True)
 
             result = Transactions.query.filter_by(user_id=args["payload"]["user_id"]).all()
-            result = Transactions.query.filter_by(issue_at = args["payload"]["datetime"]).all()
         except Exception as e:
             logging.error('Exception ERROR => ' + str(e))
             abort(400)
@@ -217,8 +218,8 @@ api.add_resource(Transaction,"/transaction")
 
 if __name__ == "__main__":
     # for test purpose only
-    #app.run(host="127.0.0.1", port='5555',debug=True)
+    app.run(host="127.0.0.1", port='5555',debug=True)
 
     # get PORT information form the environment variable
-    app.run(host="0.0.0.0", port=os.environ.get('PORT'),debug=True)
+    #app.run(host="0.0.0.0", port=os.environ.get('PORT'),debug=True)
 
