@@ -73,8 +73,9 @@ resource_fields_donation = {
     'stream_id' : fields.Integer,
     'amount': fields.Integer,
     'remain': fields.Integer,
-    'create_at': fields.Float,
+    'datetime': fields.Float,
     'donor_id': fields.Integer,
+    'username': fields.String,
 }
 resource_fields_transaction= {
     'transaction_id' : fields.Integer,
@@ -93,7 +94,9 @@ class Donation(Resource):
     def get(self, stream_id):
         try:
             result = DonationRecords.query.filter_by(stream_id=stream_id).all()
-            print(result)
+            #print(result)
+            #username = Users.query.filter_by(id=result.donor_id).first().username
+            #result.insert('username', username)
             print (type(result))
         except Exception as e:
             logging.error('Exception ERROR => ' + str(e))
@@ -122,29 +125,30 @@ class Donation(Resource):
             extra_parser = reqparse.RequestParser()
             extra_parser.add_argument("donor_id", type = int, help = "donor_id require", required = True)
             extra_parser.add_argument("amount", type = int, help = "amount require", required = True)
-            extra_parser.add_argument("create_at", type = float, help = "create time require", required = True)
+            extra_parser.add_argument("datetime", type = float, help = "datetime require", required = True)
 
             # get user info
-            create_at=args["payload"]["create_at"]
+            datetime=args["payload"]["datetime"]
             amount=args["payload"]["amount"]
             donor_id=args["payload"]["donor_id"]
             user = Users.query.filter_by(id=donor_id).first()
-            if user is None:
+            if user == []:
                 logging.error('no user')
                 abort(400)
             if user.points < amount:
                 logging.error('no enough points')
                 abort(400)
-            if datetime.now().timestamp()-create_at < 0.2 or datetime.now().timestamp()-create_at > 0.2:
+            if datetime.now().timestamp()-datetime < 0.2 or datetime - datetime.now().timestamp() > 0:
                 logging.error('time out')
                 abort(400)
             remain = user.points - amount
-
+            user.points -= amount
+            
             donation = DonationRecords(stream_id=stream_id, 
                                     amount=amount, 
                                     remain=remain, 
                                     donor_id=donor_id,
-                                    create_at = create_at
+                                    create_at = datetime.now().timestamp()
                                     )
             db.session.add(donation)
             db.session.commit()
@@ -169,7 +173,13 @@ class Transaction(Resource):
             extra_parser = reqparse.RequestParser()
             extra_parser.add_argument("user_id", type=int, help="user_id require", required=True)
             extra_parser.add_argument("datetime", type=float, help="datetime require", required=True)
+            datetime = args["payload"]["datetime"]
 
+            if datetime.now().timestamp()-datetime < 0.2 or datetime - datetime.now().timestamp() > 0:
+                logging.error('time out')
+                abort(400)
+
+            
             result = Transactions.query.filter_by(user_id=args["payload"]["user_id"]).all()
         except Exception as e:
             logging.error('Exception ERROR => ' + str(e))
@@ -191,9 +201,16 @@ class Transaction(Resource):
         extra_parser.add_argument("cost", type=float, help="cost require", required=True)
         extra_parser.add_argument("issue_at", type=float, help="issue_at require", required=True)
         #set success true
+
         amount = args["payload"]["amount"]
         user_id = args["payload"]["user_id"]
         cost = args["payload"]["cost"]
+        issue_at = args["payload"]["issue_at"]
+        
+        if datetime.now().timestamp()-issue_at < 0.2 or issue_at - datetime.now().timestamp() > 0:
+                logging.error('time out')
+                abort(400)
+
         try:
             user = Users.query.filter_by(id=user_id).first()
             user.points += amount
@@ -217,9 +234,6 @@ api.add_resource(Transaction,"/transaction")
 
 
 if __name__ == "__main__":
-    # for test purpose only
-    app.run(host="127.0.0.1", port='5555',debug=True)
-
+    app.run(host="127.0.0.1", port=5555,debug=True)
     # get PORT information form the environment variable
     #app.run(host="0.0.0.0", port=os.environ.get('PORT'),debug=True)
-
