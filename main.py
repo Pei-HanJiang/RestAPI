@@ -1,8 +1,9 @@
-from flask import Flask, request, jsonify, Response, json
+from flask import Flask
 from flask_restful import Api, Resource, reqparse, abort, fields, marshal_with
 from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime
 import logging
+import os
 logging.basicConfig(level=logging.DEBUG)
 app = Flask(__name__)
 # specify that we're using restful api
@@ -215,4 +216,9 @@ api.add_resource(Transaction,"/transaction")
 
 
 if __name__ == "__main__":
-    app.run(host="127.0.0.1", port=5555,debug=True)
+    # for test purpose only
+    #app.run(host="127.0.0.1", port='5555',debug=True)
+
+    # get PORT information form the environment variable
+    app.run(host="0.0.0.0", port=os.environ.get('PORT'),debug=True)
+
