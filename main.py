@@ -94,9 +94,6 @@ class Donation(Resource):
     def get(self, stream_id):
         try:
             result = DonationRecords.query.filter_by(stream_id=stream_id).all()
-            #print(result)
-            #username = Users.query.filter_by(id=result.donor_id).first().username
-            #result.insert('username', username)
             print (type(result))
         except Exception as e:
             logging.error('Exception ERROR => ' + str(e))
@@ -234,6 +231,6 @@ api.add_resource(Transaction,"/transaction")
 
 
 if __name__ == "__main__":
-    app.run(host="127.0.0.1", port=5555,debug=True)
+    app.run(host="127.0.0.1", port=5000,debug=True)
     # get PORT information form the environment variable
     #app.run(host="0.0.0.0", port=os.environ.get('PORT'),debug=True)
