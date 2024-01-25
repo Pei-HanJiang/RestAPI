@@ -73,7 +73,7 @@ resource_fields_donation = {
     'stream_id' : fields.Integer,
     'amount': fields.Integer,
     'remain': fields.Integer,
-    'datetime': fields.Float,
+    'create_at': fields.Float,
     'donor_id': fields.Integer,
     'username': fields.String,
 }
@@ -82,8 +82,7 @@ resource_fields_transaction= {
     'success' : fields.Boolean,
     'amount': fields.Integer,
     'cost': fields.Float,
-    'issue_at': fields.Float,
-    'user_id': fields.Integer,
+    'issue_at': fields.Float
 }
 
 # Restful API
@@ -141,19 +140,19 @@ class Donation(Resource):
             remain = user.points - amount
             user.points -= amount
             
-            donation = DonationRecords(stream_id=stream_id, 
+            result = DonationRecords(stream_id=stream_id, 
                                     amount=amount, 
                                     remain=remain, 
                                     donor_id=donor_id,
                                     create_at = datetime.now().timestamp()
                                     )
-            db.session.add(donation)
+            db.session.add(result)
             db.session.commit()
         except Exception as e:
             logging.error('Exception ERROR => ' + str(e))
             abort(400)
         
-        return donation, 200
+        return result, 200
 
 
 # 2. Transaction API
@@ -178,6 +177,7 @@ class Transaction(Resource):
 
             
             result = Transactions.query.filter_by(user_id=args["payload"]["user_id"]).all()
+            # issue_at
         except Exception as e:
             logging.error('Exception ERROR => ' + str(e))
             abort(400)
@@ -231,6 +231,6 @@ api.add_resource(Transaction,"/transaction")
 
 
 if __name__ == "__main__":
-    app.run(host="127.0.0.1", port=5000,debug=True)
+    app.run(host="127.0.0.1", port=5555,debug=True)
     # get PORT information form the environment variable
-    #app.run(host="0.0.0.0", port=os.environ.get('PORT'),debug=True)
+    # app.run(host="0.0.0.0", port=os.environ.get('PORT'),debug=True)
