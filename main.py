@@ -1,4 +1,4 @@
-from flask import Flask,json
+from flask import Flask
 from flask_restful import Api, Resource, reqparse, abort, fields, marshal_with
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import and_
@@ -94,7 +94,7 @@ class Donation(Resource):
     def get(self, stream_id):
         try:
             result = DonationRecords.query.filter_by(stream_id=stream_id).all()
-            print (type(result))
+            print (result)
         except Exception as e:
             logging.error('Exception ERROR => ' + str(e))
             abort(400)
@@ -103,7 +103,7 @@ class Donation(Resource):
             logging.error('no results')
             abort(400)
         else:
-            return (result), 200
+            return result, 200
         
         # An Object, must serialize it at line 66
     
