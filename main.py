@@ -1,7 +1,6 @@
-from flask import Flask
+from flask import Flask,json
 from flask_restful import Api, Resource, reqparse, abort, fields, marshal_with
 from flask_sqlalchemy import SQLAlchemy
-from sqlalchemy import and_
 from datetime import datetime
 import logging
 import os
@@ -92,17 +91,43 @@ class Donation(Resource):
     @marshal_with(resource_fields_donation)
     def get(self, stream_id):
         try:
-            result = DonationRecords.query.filter_by(stream_id=stream_id).all()
-            print (result)
+            search = db.session.query(DonationRecords,Users).outerjoin(Users, (Users.id == DonationRecords.donor_id)).filter(DonationRecords.stream_id==stream_id).all()
+            # result = db.session.query(DonationRecords).join_subquery(Users,Users.id==DonationRecords.donor_id).filter(DonationRecords.stream_id==stream_id).all()
+            # result = db.session.query(DonationRecords).join(Users,Users.id==DonationRecords.donor_id).filter(DonationRecords.stream_id==stream_id).first()
+            # result = db.session
+            # result = DonationRecords.query.outerjoin(Users, (Users.id == DonationRecords.donor_id)).filter(DonationRecords.stream_id==stream_id).all()
+            # result = result[0][0].__dict__
+            # for l in range(1,len(result)):
+            #     result.update(result[l].__dict__)
+            result = []
+            for row in search:
+                d={}
+                for r in row:
+                    d.update(r.__dict__)
+                    print(type(r.__dict__))
+                    print(type(r))
+                    # print(r.__dict__)
+                
+                d.update({'donation_id':d.get('id')})
+
+                result.append(d)
+
+            # print("Column b: %s" % row._mapping[table.c.b])
+            # lis = []
+            # print (result[0]._mapping)
+            # print (type(result[0]._mapping))
+            # print (result[0])
+            # print (type(result[0]))
+            # print (type(result))
         except Exception as e:
             logging.error('Exception ERROR => ' + str(e))
             abort(400)
         
-        if len(result) == 0:
-            logging.error('no results')
-            abort(400)
+        # if len(result) == 0:
+        #     logging.error('no results')
+        #     abort(400)
         else:
-            return result, 200
+            return (result), 200
         
         # An Object, must serialize it at line 66
     
@@ -137,8 +162,8 @@ class Donation(Resource):
             if datetime.now().timestamp()-datetime < 0.2 or datetime - datetime.now().timestamp() > 0:
                 logging.error('time out')
                 abort(400)
+            remain = user.points - amount
             user.points -= amount
-            remain = user.points
             
             result = DonationRecords(stream_id=stream_id, 
                                     amount=amount, 
@@ -231,6 +256,16 @@ api.add_resource(Transaction,"/transaction")
 
 
 if __name__ == "__main__":
+    # result = DonationRecords(
+    #                             stream_id=1,
+    #                             amount=300, 
+    #                             remain=9999, 
+    #                             donor_id=1,
+    #                             create_at = datetime.now().timestamp()
+    #                                 )
+    # with app.app_context():
+    #     db.session.add(result)
+    #     db.session.commit()
     app.run(host="127.0.0.1", port=5555,debug=True)
     # get PORT information form the environment variable
     # app.run(host="0.0.0.0", port=os.environ.get('PORT'),debug=True)
