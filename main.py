@@ -40,6 +40,9 @@ class DonationRecords(db.Model):
 
     def __repr__(self):
         return f"DonationRecords(donation_id = {self.id}, stream_id = {self.stream_id}, amount = {self.amount}, remain = {self.remain}, create_at = {self.create_at}, donor_id = {self.donor_id})"
+    # def __dict__(self):
+
+
 
 # DB: Transactions
 class Transactions(db.Model):
@@ -51,7 +54,7 @@ class Transactions(db.Model):
     user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable = False)
 
     def __repr__(self):
-        return f"Transaction(id = {self.id}, stream_id = {self.success}, amount = {self.amount}, remain = {self.cost}, create_at = {self.issue_at}, user_id = {self.user_id})"
+        return f"Transaction(id = {self.id}, success = {self.success}, amount = {self.amount}, remain = {self.cost}, create_at = {self.issue_at}, user_id = {self.user_id})"
 
 # DB: Streams
 class Streams(db.Model):
@@ -74,7 +77,7 @@ resource_fields_donation = {
     'remain': fields.Integer,
     'create_at': fields.Float,
     'donor_id': fields.Integer,
-    'username': fields.String,
+    'username': fields.String
 }
 resource_fields_transaction= {
     'transaction_id' : fields.Integer,
@@ -92,13 +95,6 @@ class Donation(Resource):
     def get(self, stream_id):
         try:
             search = db.session.query(DonationRecords,Users).outerjoin(Users, (Users.id == DonationRecords.donor_id)).filter(DonationRecords.stream_id==stream_id).all()
-            # result = db.session.query(DonationRecords).join_subquery(Users,Users.id==DonationRecords.donor_id).filter(DonationRecords.stream_id==stream_id).all()
-            # result = db.session.query(DonationRecords).join(Users,Users.id==DonationRecords.donor_id).filter(DonationRecords.stream_id==stream_id).first()
-            # result = db.session
-            # result = DonationRecords.query.outerjoin(Users, (Users.id == DonationRecords.donor_id)).filter(DonationRecords.stream_id==stream_id).all()
-            # result = result[0][0].__dict__
-            # for l in range(1,len(result)):
-            #     result.update(result[l].__dict__)
             result = []
             for row in search:
                 d={}
@@ -106,26 +102,18 @@ class Donation(Resource):
                     d.update(r.__dict__)
                     print(type(r.__dict__))
                     print(type(r))
-                    # print(r.__dict__)
                 
                 d.update({'donation_id':d.get('id')})
 
                 result.append(d)
 
-            # print("Column b: %s" % row._mapping[table.c.b])
-            # lis = []
-            # print (result[0]._mapping)
-            # print (type(result[0]._mapping))
-            # print (result[0])
-            # print (type(result[0]))
-            # print (type(result))
         except Exception as e:
             logging.error('Exception ERROR => ' + str(e))
             abort(400)
         
-        # if len(result) == 0:
-        #     logging.error('no results')
-        #     abort(400)
+        if len(result) == 0:
+            logging.error('no results')
+            abort(400)
         else:
             return (result), 200
         
@@ -149,30 +137,44 @@ class Donation(Resource):
             extra_parser.add_argument("datetime", type = float, help = "datetime require", required = True)
 
             # get user info
-            datetime=args["payload"]["datetime"]
+            date=args["payload"]["datetime"]
             amount=args["payload"]["amount"]
             donor_id=args["payload"]["donor_id"]
+            
             user = Users.query.filter_by(id=donor_id).first()
             if user == []:
                 logging.error('no user')
                 abort(400)
+
             if user.points < amount:
                 logging.error('no enough points')
                 abort(400)
-            if datetime.now().timestamp()-datetime < 0.2 or datetime - datetime.now().timestamp() > 0:
-                logging.error('time out')
-                abort(400)
+                # ///////////////////////
+            # if datetime.now().timestamp()-datetime < 0.2 or datetime - datetime.now().timestamp() > 0:
+            #     logging.error('time out')
+            #     abort(400)
             remain = user.points - amount
             user.points -= amount
             
             result = DonationRecords(stream_id=stream_id, 
-                                    amount=amount, 
+                                    amount=amount,
                                     remain=remain, 
                                     donor_id=donor_id,
+                                    # /////////////////////////////////////////////////////////
                                     create_at = datetime.now().timestamp()
                                     )
             db.session.add(result)
             db.session.commit()
+            
+            result = {  'stream_id' : stream_id, 
+                        'amount' : amount, 
+                        'remain' : remain, 
+                        'donor_id' : donor_id,
+                        # /////////////////////////////////////////////////////////
+                        'create_at' : datetime.now().timestamp(),
+                        'username' : user.username,
+                        'donation_id':result.id
+                        }
         except Exception as e:
             logging.error('Exception ERROR => ' + str(e))
             abort(400)
