@@ -80,7 +80,7 @@ resource_fields_donation = {
     'username': fields.String
 }
 resource_fields_transaction= {
-    'transaction_id' : fields.Integer,
+    'transaction_id': fields.Integer(attribute='id'),
     'success' : fields.Boolean,
     'amount': fields.Integer,
     'cost': fields.Float,
@@ -116,8 +116,6 @@ class Donation(Resource):
             abort(400)
         else:
             return (result), 200
-        
-        # An Object, must serialize it at line 66
     
     # post a new donation 
     # needs to update donation records, and user points
@@ -149,19 +147,18 @@ class Donation(Resource):
             if user.points < amount:
                 logging.error('no enough points')
                 abort(400)
-                # ///////////////////////
-            # if datetime.now().timestamp()-datetime < 0.2 or datetime - datetime.now().timestamp() > 0:
-            #     logging.error('time out')
-            #     abort(400)
+            if datetime.now().timestamp()-date < 0 or datetime.now().timestamp() - date > 0.2:
+                logging.error('time out')
+                abort(400)
             remain = user.points - amount
             user.points -= amount
             
+            create_time = datetime.now().timestamp()
             result = DonationRecords(stream_id=stream_id, 
                                     amount=amount,
                                     remain=remain, 
                                     donor_id=donor_id,
-                                    # /////////////////////////////////////////////////////////
-                                    create_at = datetime.now().timestamp()
+                                    create_at = create_time
                                     )
             db.session.add(result)
             db.session.commit()
@@ -170,8 +167,7 @@ class Donation(Resource):
                         'amount' : amount, 
                         'remain' : remain, 
                         'donor_id' : donor_id,
-                        # /////////////////////////////////////////////////////////
-                        'create_at' : datetime.now().timestamp(),
+                        'create_at' : create_time,
                         'username' : user.username,
                         'donation_id':result.id
                         }
@@ -196,15 +192,14 @@ class Transaction(Resource):
             extra_parser = reqparse.RequestParser()
             extra_parser.add_argument("user_id", type=int, help="user_id require", required=True)
             extra_parser.add_argument("datetime", type=float, help="datetime require", required=True)
-            datetime = args["payload"]["datetime"]
+            date = args["payload"]["datetime"]
 
-            if datetime.now().timestamp()-datetime < 0.2 or datetime - datetime.now().timestamp() > 0:
+            if datetime.now().timestamp()-date < 0 or datetime.now().timestamp() - date > 0.2:
                 logging.error('time out')
                 abort(400)
 
             
             result = Transactions.query.filter_by(user_id=args["payload"]["user_id"]).all()
-            # issue_at
         except Exception as e:
             logging.error('Exception ERROR => ' + str(e))
             abort(400)
@@ -231,7 +226,7 @@ class Transaction(Resource):
         cost = args["payload"]["cost"]
         issue_at = args["payload"]["issue_at"]
         
-        if datetime.now().timestamp()-issue_at < 0.2 or issue_at - datetime.now().timestamp() > 0:
+        if datetime.now().timestamp()-issue_at < 0 or datetime.now().timestamp() - issue_at > 0.2:
                 logging.error('time out')
                 abort(400)
 
@@ -258,16 +253,6 @@ api.add_resource(Transaction,"/transaction")
 
 
 if __name__ == "__main__":
-    # result = DonationRecords(
-    #                             stream_id=1,
-    #                             amount=300, 
-    #                             remain=9999, 
-    #                             donor_id=1,
-    #                             create_at = datetime.now().timestamp()
-    #                                 )
-    # with app.app_context():
-    #     db.session.add(result)
-    #     db.session.commit()
     app.run(host="127.0.0.1", port=5555,debug=True)
     # get PORT information form the environment variable
     # app.run(host="0.0.0.0", port=os.environ.get('PORT'),debug=True)
