@@ -70,14 +70,23 @@ class Streams(db.Model):
 #db.create_all()
 
 # serialize
+def get_username(donation):
+    user = Users.query.filter_by(id = donation.donor_id).first()
+    username =  user.username if user else None
+
+    if username is None:
+        logging.error('username not found')
+    return username
+
+
 resource_fields_donation = {
-    'donation_id' : fields.Integer,
+    'donation_id' : fields.Integer(attribute = 'id'),
     'stream_id' : fields.Integer,
     'amount': fields.Integer,
     'remain': fields.Integer,
     'create_at': fields.Float,
     'donor_id': fields.Integer,
-    'username': fields.String
+    'donor_name': fields.String(attribute= get_username)
 }
 resource_fields_transaction= {
     'transaction_id': fields.Integer(attribute='id'),
@@ -94,35 +103,24 @@ class Donation(Resource):
     @marshal_with(resource_fields_donation)
     def get(self, stream_id):
         try:
-            search = db.session.query(DonationRecords,Users).outerjoin(Users, (Users.id == DonationRecords.donor_id)).filter(DonationRecords.stream_id==stream_id).all()
-            result = []
-            for row in search:
-                d={}
-                for r in row:
-                    d.update(r.__dict__)
-                    print(type(r.__dict__))
-                    print(type(r))
-                
-                d.update({'donation_id':d.get('id')})
-
-                result.append(d)
+            result = DonationRecords.query.filter_by(stream_id=stream_id).all()
+            stream = Streams.query.filter_by(id=stream_id).first()
+            if stream is None:
+                logging.error('Stream does not exist')
+                abort(400)
 
         except Exception as e:
             logging.error('Exception ERROR => ' + str(e))
             abort(400)
-        
-        if len(result) == 0:
-            logging.error('no results')
-            abort(400)
         else:
             return (result), 200
-    
     # post a new donation 
     # needs to update donation records, and user points
     @marshal_with(resource_fields_donation)
     def post(self, stream_id):
         # automatically parse the data sent(define the needed parameters)
         # warning!!! nested json requires special parsing techniques
+        print("post")
         try:
             parser = reqparse.RequestParser()
             parser.add_argument("signature", type=str, help="signature require", required = True)
@@ -138,18 +136,27 @@ class Donation(Resource):
             date=args["payload"]["datetime"]
             amount=args["payload"]["amount"]
             donor_id=args["payload"]["donor_id"]
+
+            stream = Streams.query.filter_by(id=stream_id).first()
+            if stream is None:
+                logging.error('Stream does not exist')
+                abort(400)
+
+            if amount < 0:
+                logging.error("amount can't be negative")
+                abort(400)
             
             user = Users.query.filter_by(id=donor_id).first()
-            if user == []:
-                logging.error('no user')
+            if user is None:
+                logging.error('user does not exist')
                 abort(400)
 
             if user.points < amount:
                 logging.error('no enough points')
                 abort(400)
-            if datetime.now().timestamp()-date < 0 or datetime.now().timestamp() - date > 0.2:
-                logging.error('time out')
-                abort(400)
+            # if datetime.now().timestamp()-date < 0 or datetime.now().timestamp() - date > 0.2:
+            #     logging.error('time out')
+            #     abort(400)
             remain = user.points - amount
             user.points -= amount
             
@@ -163,14 +170,6 @@ class Donation(Resource):
             db.session.add(result)
             db.session.commit()
             
-            result = {  'stream_id' : stream_id, 
-                        'amount' : amount, 
-                        'remain' : remain, 
-                        'donor_id' : donor_id,
-                        'create_at' : create_time,
-                        'username' : user.username,
-                        'donation_id':result.id
-                        }
         except Exception as e:
             logging.error('Exception ERROR => ' + str(e))
             abort(400)
@@ -194,8 +193,13 @@ class Transaction(Resource):
             extra_parser.add_argument("datetime", type=float, help="datetime require", required=True)
             date = args["payload"]["datetime"]
 
-            if datetime.now().timestamp()-date < 0 or datetime.now().timestamp() - date > 0.2:
-                logging.error('time out')
+#            if datetime.now().timestamp()-date < 0 or datetime.now().timestamp() - date > 0.2:
+#                logging.error('time out')
+#                abort(400)
+            
+            user = Users.query.filter_by(id=args["payload"]["user_id"]).first()
+            if user is None:
+                logging.error('user does not exist')
                 abort(400)
 
             
@@ -225,13 +229,24 @@ class Transaction(Resource):
         user_id = args["payload"]["user_id"]
         cost = args["payload"]["cost"]
         issue_at = args["payload"]["issue_at"]
+
+        if amount < 0:
+            logging.error("amount can't be negative")
+            abort(400)
+
+        if cost < 0:
+            logging.error("cost can't be negative")
+            abort(400)
         
-        if datetime.now().timestamp()-issue_at < 0 or datetime.now().timestamp() - issue_at > 0.2:
-                logging.error('time out')
-                abort(400)
+#        if datetime.now().timestamp()-issue_at < 0 or datetime.now().timestamp() - issue_at > 0.2:
+#                logging.error('time out')
+#                abort(400)
 
         try:
             user = Users.query.filter_by(id=user_id).first()
+            if user is None:
+                logging.error('User does not exist')
+                abort(400)
             user.points += amount
             result = Transactions(amount=amount,
                                 cost=cost, 
@@ -244,15 +259,14 @@ class Transaction(Resource):
             abort(400)
         
         return result, 200
-    
 
 # add api
-api.add_resource(Donation, "/donation/<int:stream_id>")
-api.add_resource(Transaction,"/transaction")
+api.add_resource(Donation, "/donations/<int:stream_id>")
+api.add_resource(Transaction,"/transactions")
 
 
 
 if __name__ == "__main__":
-    #app.run(host="127.0.0.1", port=5555,debug=True)
     # get PORT information form the environment variable
-    app.run(host="0.0.0.0", port=os.environ.get('PORT'),debug=True)
+    # app.run(host="0.0.0.0", port=os.environ.get('PORT'),debug=True)
+    app.run(host="0.0.0.0", port=8070,debug=True)
