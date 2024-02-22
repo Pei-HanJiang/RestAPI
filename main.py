@@ -4,13 +4,17 @@ from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime
 import logging
 import os
-logging.basicConfig(level=logging.DEBUG)
+
+if (int(os.environ.get('DEVELOPMENT',0))==1):
+    logging.basicConfig(level=logging.DEBUG)
+else:
+    logging.basicConfig(level=logging.CRITICAL)
 app = Flask(__name__)
 # specify that we're using restful api
 api = Api(app)
 
 #config DB
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///Database.db'
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///../data/Database.db'
 db = SQLAlchemy(app)
 # DB: Users
 class Users(db.Model):
@@ -108,7 +112,6 @@ class Donation(Resource):
             if stream is None:
                 logging.error('Stream does not exist')
                 abort(400)
-
         except Exception as e:
             logging.error('Exception ERROR => ' + str(e))
             abort(400)
@@ -142,13 +145,14 @@ class Donation(Resource):
                 logging.error('Stream does not exist')
                 abort(400)
 
-            if amount < 0:
-                logging.error("amount can't be negative")
-                abort(400)
-            
+
             user = Users.query.filter_by(id=donor_id).first()
             if user is None:
-                logging.error('user does not exist')
+                logging.error('no user')
+                abort(400)
+
+            if amount < 0:
+                logging.error("amount can't be negative")
                 abort(400)
 
             if user.points < amount:
@@ -193,16 +197,15 @@ class Transaction(Resource):
             extra_parser.add_argument("datetime", type=float, help="datetime require", required=True)
             date = args["payload"]["datetime"]
 
-#            if datetime.now().timestamp()-date < 0 or datetime.now().timestamp() - date > 0.2:
-#                logging.error('time out')
-#                abort(400)
-            
+            # if datetime.now().timestamp()-date < 0 or datetime.now().timestamp() - date > 0.2:
+            #     logging.error('time out')
+            #     abort(400)
+
             user = Users.query.filter_by(id=args["payload"]["user_id"]).first()
             if user is None:
                 logging.error('user does not exist')
                 abort(400)
 
-            
             result = Transactions.query.filter_by(user_id=args["payload"]["user_id"]).all()
         except Exception as e:
             logging.error('Exception ERROR => ' + str(e))
@@ -229,18 +232,10 @@ class Transaction(Resource):
         user_id = args["payload"]["user_id"]
         cost = args["payload"]["cost"]
         issue_at = args["payload"]["issue_at"]
-
-        if amount < 0:
-            logging.error("amount can't be negative")
-            abort(400)
-
-        if cost < 0:
-            logging.error("cost can't be negative")
-            abort(400)
         
-#        if datetime.now().timestamp()-issue_at < 0 or datetime.now().timestamp() - issue_at > 0.2:
-#                logging.error('time out')
-#                abort(400)
+        # if datetime.now().timestamp()-issue_at < 0 or datetime.now().timestamp() - issue_at > 0.2:
+        #         logging.error('time out')
+        #         abort(400)
 
         try:
             user = Users.query.filter_by(id=user_id).first()
@@ -267,6 +262,6 @@ api.add_resource(Transaction,"/transactions")
 
 
 if __name__ == "__main__":
-    # get PORT information form the environment variable
-    app.run(host="0.0.0.0", port=os.environ.get('PORT'),debug=True)
-    #app.run(host="0.0.0.0", port=8070,debug=True)
+#     # get PORT information form the environment variable
+    app.run(host="0.0.0.0", port=8070,debug=int(os.environ.get('DEVELOPMENT',0))==1)
+    # app.run(host="0.0.0.0", port=8070,debug=True)
