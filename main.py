@@ -263,5 +263,5 @@ api.add_resource(Transaction,"/transactions")
 
 if __name__ == "__main__":
 #     # get PORT information form the environment variable
-    app.run(host="0.0.0.0", port=8070,debug=int(os.environ.get('DEVELOPMENT',0))==1)
+    app.run(host="0.0.0.0", port=8070,debug=(int(os.environ.get('DEVELOPMENT',0))==1))
     # app.run(host="0.0.0.0", port=8070,debug=True)
