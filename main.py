@@ -123,7 +123,6 @@ class Donation(Resource):
     def post(self, stream_id):
         # automatically parse the data sent(define the needed parameters)
         # warning!!! nested json requires special parsing techniques
-        print("post")
         try:
             parser = reqparse.RequestParser()
             parser.add_argument("signature", type=str, help="signature require", required = True)
@@ -158,9 +157,11 @@ class Donation(Resource):
             if user.points < amount:
                 logging.error('no enough points')
                 abort(400)
-            # if datetime.now().timestamp()-date < 0 or datetime.now().timestamp() - date > 0.2:
-            #     logging.error('time out')
-            #     abort(400)
+# -------------------------------------------------------------------------
+            if datetime.now().timestamp()-date < 0 or datetime.now().timestamp() - date > 0.2:
+                logging.error('time out')
+                abort(400)
+
             remain = user.points - amount
             user.points -= amount
             
@@ -197,9 +198,9 @@ class Transaction(Resource):
             extra_parser.add_argument("datetime", type=float, help="datetime require", required=True)
             date = args["payload"]["datetime"]
 
-            # if datetime.now().timestamp()-date < 0 or datetime.now().timestamp() - date > 0.2:
-            #     logging.error('time out')
-            #     abort(400)
+            if datetime.now().timestamp()-date < 0 or datetime.now().timestamp() - date > 0.2:
+                logging.error('time out')
+                abort(400)
 
             user = Users.query.filter_by(id=args["payload"]["user_id"]).first()
             if user is None:
@@ -232,21 +233,34 @@ class Transaction(Resource):
         user_id = args["payload"]["user_id"]
         cost = args["payload"]["cost"]
         issue_at = args["payload"]["issue_at"]
-        
-        # if datetime.now().timestamp()-issue_at < 0 or datetime.now().timestamp() - issue_at > 0.2:
-        #         logging.error('time out')
-        #         abort(400)
+        suc=True
+# ------------------------------------------------------------------------------------
+        if datetime.now().timestamp()-issue_at < 0 or datetime.now().timestamp() - issue_at > 0.2:
+                logging.error('time out')
+                suc=False
+                abort(400)
 
         try:
             user = Users.query.filter_by(id=user_id).first()
             if user is None:
                 logging.error('User does not exist')
+                suc=False
                 abort(400)
-            user.points += amount
+            if amount<0:
+                logging.error('amount < 0')
+                suc=False
+                abort(400)
+            if cost<0:
+                logging.error('cost < 0')
+                suc=False
+                abort(400)
+            if suc:
+                user.points += amount
             result = Transactions(amount=amount,
                                 cost=cost, 
                                 user_id=user_id,
-                                issue_at=datetime.now().timestamp())
+                                issue_at=datetime.now().timestamp(),
+                                success=suc)
             db.session.add(result)
             db.session.commit()
         except Exception as e:
